@@ -31,6 +31,45 @@ proxies=[
         # 'lexical-density-lemmas-clean-bare'
         ]
 
+syn_proxies = [
+  'inverse mean-node-degree',
+  'max tree depth',
+  'num-node-types',
+  'node-type-diversity',
+  'num-nodes',
+  'num-node-types',
+  'sentence-length-bare',
+  'sentence-length',
+]
+
+lex_proxies = [
+  'mean-word-length',
+
+  'lexical-diversity words',
+  'lexical-diversity words-clean',
+  'lexical-diversity words-clean-bare',
+
+  'lexical-density words',
+  'lexical-density words-clean',
+  'lexical-density words-clean-bare',
+
+  'lexical-density lemmas',
+  'lexical-density lemmas-clean',
+  'lexical-density lemmas-clean-bare',
+
+  'lexical-diversity lemmas',
+  'lexical-diversity lemmas-clean',
+  'lexical-diversity lemmas-clean-bare',
+
+  'TTR words',
+  'TTR words-clean',
+  'TTR words-clean-bare'
+
+  'TTR lemmas',
+  'TTR lemmas-clean',
+  'TTR lemmas-clean-bare'
+]
+
 def pearson_spearman(x,y):
     from scipy.stats import pearsonr
     from scipy.stats import spearmanr
@@ -187,8 +226,18 @@ def is_question_number_ending(row):
 is_question_number_ending.num_re = re.compile(r"\d+/\d+")
 
 
+def apply_lexical_measures(df, big):
+  ss = ["words","words-clean", "words-clean-bare", "lemmas", "lemmas-clean","lemmas-clean-bare"]
+  for t in ss:
+    df[f"lexical-density {t}"] = lexical_density(big[t])
+    df[f"lexical-diversity {t}"] = lexical_diversity(big[t])
+  return df
+
 def load_proxies():
     return pd.read_csv("proxies.csv",low_memory=False)
+
+def save_proxies(df):
+  df.to_csv("proxies.csv")
 
 def load_df():
   return pd.read_pickle("d.pickle")
@@ -229,12 +278,20 @@ def copy_proxies(df):
   return df[cols].copy()
 
 def lexical_density(series):
+  import numpy as np
   t2l = token2lexscore(series)
-  return series.apply(lambda sent: np.sum([t2l[word] for word in sent]) / float(len(sent)) )
+  return series.apply(lambda sent: [t2l[word] for word in set(sent)]).apply(np.mean)
+
+def lexical_diversity(series):
+  import numpy as np
+  t2l = token2lexscore(series)
+  return series.apply(lambda sent: [t2l[word] for word in set(sent)]).apply(np.nansum)
+  #return series.apply(lambda sent: np.nansum([t2l[word] for word in set(sent)]))
   
 
 def token2lexscore(series):
   from gensim import corpora
+  import numpy as np
   dct = corpora.Dictionary(doc for doc in series)
   
   df = pd.DataFrame([(k,dct.cfs[v]) for k,v in dct.token2id.items()],columns=["token","frequency"])
@@ -242,7 +299,7 @@ def token2lexscore(series):
   df = df.sort_values("frequency")
   
   df["rank"] = df["frequency"].rank(method="dense",ascending=False)
-  df["lexscore"] = np.maximum(np.log2(df["rank"]),0)
+  df["lexscore"] = np.log2(df["rank"]+1)
   return {
     tok: score for tok,score in zip(df["token"],df["lexscore"])
   } 
