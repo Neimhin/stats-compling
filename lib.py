@@ -11,64 +11,61 @@ mpl.rcParams["text.usetex"]=True
 mpl.rcParams["lines.linewidth"]=0.9
 mpl.rcParams["figure.dpi"]=400
 
-proxies=[
-        'TTR words',
-        'TTR lemmas',
-        # 'TTR lemmas clean',
-        # 'TTR lemmas clean and bare',
-        # 'mean-node-degree',
-        'max tree depth',
-        'num_node_types',
-        'node-type-diversity',
-        'num-nodes',
-        'num-node-types',
-        # 'sentence-length-bare',
-        'sentence-length',
-        'mean-word-length',
-        'lexical-density-words',
-        # 'lexical-density-lemmas',
-        # 'lexical-density-lemmas-clean',
-        # 'lexical-density-lemmas-clean-bare'
-        ]
-
 syn_proxies = [
   'inverse mean-node-degree',
-  'max tree depth',
-  'num-node-types',
+  'max-tree-depth',
+
   'node-type-diversity',
   'num-nodes',
   'num-node-types',
+
   'sentence-length-bare',
   'sentence-length',
 ]
 
-lex_proxies = [
+lex_proxies_dirty = [
   'mean-word-length',
-
   'lexical-diversity words',
-  'lexical-diversity words-clean',
-  'lexical-diversity words-clean-bare',
-
   'lexical-density words',
-  'lexical-density words-clean',
-  'lexical-density words-clean-bare',
-
   'lexical-density lemmas',
-  'lexical-density lemmas-clean',
-  'lexical-density lemmas-clean-bare',
-
   'lexical-diversity lemmas',
-  'lexical-diversity lemmas-clean',
-  'lexical-diversity lemmas-clean-bare',
-
   'TTR words',
-  'TTR words-clean',
-  'TTR words-clean-bare'
-
   'TTR lemmas',
-  'TTR lemmas-clean',
-  'TTR lemmas-clean-bare'
 ]
+
+lex_proxies_clean = [
+  'mean-word-length',
+  'lexical-diversity words-clean',
+  'lexical-density words-clean',
+  'lexical-density lemmas-clean',
+  'lexical-diversity lemmas-clean',
+  'TTR words-clean',
+  'TTR lemmas-clean',
+]
+
+lex_proxies_bare = [
+  'mean-word-length',
+  'TTR words-clean-bare'
+  'TTR lemmas-clean-bare'
+  'lexical-diversity words-clean-bare',
+  'lexical-density words-clean-bare',
+  'lexical-density lemmas-clean-bare',
+  'lexical-diversity lemmas-clean-bare',
+]
+
+lex_proxies = list(set([*lex_proxies_dirty,*lex_proxies_clean,*lex_proxies_bare]))
+
+proxies = syn_proxies + lex_proxies
+proxies_dirty = syn_proxies + lex_proxies_dirty
+proxies_clean = syn_proxies + lex_proxies_clean
+proxies_bare = syn_proxies + lex_proxies_bare
+
+def make_correlation_plots(df):
+  import matplotlib.pyplot as plt
+  corrcoefs(df, proxies=proxies); plt.savefig("corr-plot-all.png")
+  corrcoefs(df, proxies=proxies_dirty); plt.savefig("corr-plot-dirty.png")
+  corrcoefs(df, proxies=proxies_clean); plt.savefig("corr-plot-clean.png")
+  corrcoefs(df, proxies=proxies_bare); plt.savefig("corr-plot-clean.png")
 
 def pearson_spearman(x,y):
     from scipy.stats import pearsonr
