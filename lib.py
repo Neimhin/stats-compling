@@ -34,7 +34,6 @@ lex_proxies_dirty = [
 ]
 
 lex_proxies_clean = [
-  'mean-word-length',
   'lexical-diversity words-clean',
   'lexical-density words-clean',
   'lexical-density lemmas-clean',
@@ -44,9 +43,9 @@ lex_proxies_clean = [
 ]
 
 lex_proxies_bare = [
-  'mean-word-length',
-  'TTR words-clean-bare'
-  'TTR lemmas-clean-bare'
+  'mean-word-length words-clean-bare',
+  'TTR words-clean-bare',
+  'TTR lemmas-clean-bare',
   'lexical-diversity words-clean-bare',
   'lexical-density words-clean-bare',
   'lexical-density lemmas-clean-bare',
@@ -60,12 +59,94 @@ proxies_dirty = syn_proxies + lex_proxies_dirty
 proxies_clean = syn_proxies + lex_proxies_clean
 proxies_bare = syn_proxies + lex_proxies_bare
 
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def rank_forums_by_proxy_fig(df, t):
+    if t == "syn":
+      prox = syn_proxies
+    elif t == "lex":
+      prox = lex_proxies_dirty
+    elif t == "all":
+      prox = proxies
+    prox = sorted(prox)
+
+    mean_values = df.groupby("forum")[prox].mean()
+    ranked_forums = mean_values.rank(ascending=False).astype(int)
+
+    print("Forum Rankings by Proxy Measures:")
+    print(ranked_forums.to_string())
+
+    plt.clf()
+    plt.figure(figsize=(10, 6))
+    heatmap = sns.heatmap(ranked_forums, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("Forum Rankings by Proxy Measures")
+    plt.tight_layout()
+    plt.savefig("heatmap-rank-fora-by-proxies." +t+".png")
+
+
+def rank_forums_by_proxy(df, proxies):
+    mean_values = df.groupby("forum")[proxies].mean()
+    ranked_forums = mean_values.rank(ascending=False).astype(int)
+
+    print("Forum Rankings by Proxy Measures:")
+    print(ranked_forums.to_string())
+
+def descriptive_statistics(df, proxies):
+    import pandas as pd
+    # Compute the descriptive statistics for the entire dataframe
+    entire_frame_stats = df[proxies].describe().transpose()
+    print("Entire Frame:")
+    print(entire_frame_stats.to_string())
+
+    # Compute the descriptive statistics for each forum
+    print("\nPer Forum:")
+    for forum in df["forum"].unique():
+        forum_df = df[df["forum"] == forum]
+        forum_stats = forum_df[proxies].describe().transpose()
+        print(f"\n{forum} Forum:")
+        print(forum_stats.to_string())
+
+def compare_complexity_nonparametric(df, proxies, category_col, p_value_threshold=0.05):
+    import pandas as pd
+    import numpy as np
+    from scipy import stats
+    from statsmodels.stats.multicomp import MultiComparison
+    results = {}
+    for proxy in proxies:
+        # Perform Kruskal-Wallis H-test
+        categories = df[category_col].unique()
+        data = [df[df[category_col] == category][proxy] for category in categories]
+        h_stat, p_value = stats.kruskal(*data)
+        # Perform post-hoc Dunn's test with Bonferroni correction
+        if p_value < p_value_threshold:
+            mc = MultiComparison(df[proxy], df[category_col])
+            result = mc.allpairtest(stats.mannwhitneyu, method='bonf')[0]
+            results[proxy] = {
+                'h_stat': h_stat,
+                'p_value': p_value,
+                'dunn_result': result
+            }
+        else:
+            results[proxy] = {
+                'h_stat': h_stat,
+                'p_value': p_value,
+                'dunn_result': None
+            }
+    return results
+
+
 def make_correlation_plots(df):
   import matplotlib.pyplot as plt
-  corrcoefs(df, proxies=proxies); plt.savefig("corr-plot-all.png")
-  corrcoefs(df, proxies=proxies_dirty); plt.savefig("corr-plot-dirty.png")
-  corrcoefs(df, proxies=proxies_clean); plt.savefig("corr-plot-clean.png")
-  corrcoefs(df, proxies=proxies_bare); plt.savefig("corr-plot-clean.png")
+  for codist in [True, False]:
+    corrcoefs(df, proxies=proxies, codist=codist); plt.savefig(f"corr-plot-all-{codist}.png")
+    corrcoefs(df, proxies=proxies_dirty,codist=codist); plt.savefig(f"corr-plot-dirty-{codist}.png")
+    corrcoefs(df, proxies=proxies_clean,codist=codist); plt.savefig(f"corr-plot-clean-{codist}.png")
+    corrcoefs(df, proxies=proxies_bare,codist=codist); plt.savefig(f"corr-plot-bare-{codist}.png")
+
 
 def pearson_spearman(x,y):
     from scipy.stats import pearsonr
@@ -79,7 +160,17 @@ def pearson_spearman(x,y):
 def correlations(df,proxies=proxies):
     return {p: {p2: pearson_spearman(df[p],df[p2]) for p2 in proxies} for p in proxies}
 
-def corrcoefs(x,forum=r".",proxies=proxies):
+def boxplot(df,y, x="forum"):
+  import matplotlib.pyplot as plt
+  plt.clf()
+  fig = sns.boxplot(
+    x=x,
+    y=y,
+    data=df).get_figure()
+  fig.tight_layout()
+  fig.savefig("boxplot-" + y + ".png")
+
+def corrcoefs(x,forum=r".",proxies=proxies, codist=True):
     import matplotlib.pyplot as plt
     from scipy.cluster import hierarchy
     from scipy.stats import pearsonr
@@ -140,8 +231,9 @@ def corrcoefs(x,forum=r".",proxies=proxies):
     g = sns.PairGrid(x)
     plt.suptitle(' '.join([f for f in fora]))
     g.map_diag(hist)
-    g.map_lower(sns.scatterplot)
-    g.map_upper(reg_coef)
+    if codist:
+      g.map_upper(sns.scatterplot)
+    g.map_lower(reg_coef)
     g.tight_layout()
     return g
 
@@ -515,3 +607,7 @@ def label(node):
   if isTerminal(node):
     return "TERMINAL"
   return node.label
+
+def mean_word_length(sent):
+  import numpy as np
+  return np.mean([len(word) for word in sent])
