@@ -118,16 +118,20 @@ def rank_ministerial(df,prox=proxies):
     print(ranked_median)
 
     plt.clf()
-    fig, axes =  plt.subplots(2,2,figsize=(10, 20))
+    fig, axes =  plt.subplots(2,2,figsize=(8, 6))
+    for ax in axes:
+      ax[0].set(ylabel=None)
+      ax[1].set(ylabel=None)
     plt.suptitle("Ranking Pre-Ministerial vs Ministerial vs Post-Ministerial Complexity of Speeches")
 
     heatmap = sns.heatmap(ranked_mean, ax=axes[0,0], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
-    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
-    plt.title("by Proxy Measure Mean")
+    axes[0,0].set_title("by Proxy Measure Mean")
 
-    heatmap = sns.heatmap(ranked_median, ax=axes[1,0], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
-    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
-    plt.title("by Proxy Measure Median")
+    heatmap = sns.heatmap(ranked_median, ax=axes[0,1], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    axes[0,1].set_title("by Proxy Measure Median")
+
+    axes[0,0].xaxis.set_tick_params(labelbottom=False)
+    axes[0,1].xaxis.set_tick_params(labelbottom=False)
 
     grouped = df.groupby("ministerial-binary")[prox]
 
@@ -137,13 +141,11 @@ def rank_ministerial(df,prox=proxies):
     print(ranked_mean)
     print(ranked_median)
 
-    heatmap = sns.heatmap(ranked_mean, ax=axes[0,1], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap = sns.heatmap(ranked_mean, ax=axes[1,0], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
     heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
-    plt.title("by Proxy Measure Mean")
 
     heatmap = sns.heatmap(ranked_median, ax=axes[1,1], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
     heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
-    plt.title("by Proxy Measure Median")
 
     plt.tight_layout()
     plt.savefig("heatmap-rank-ministerial.nonempty.png")
@@ -154,6 +156,7 @@ def rank_forums_by_proxy_fig_nonempty(df,prox=proxies):
     
 
     grouped = df.groupby("production type")[prox]
+    print(grouped.mean())
     ranked_mean = grouped.mean().rank(ascending=False).astype(int)
     ranked_median = grouped.median().rank(ascending=False).astype(int)
 
@@ -222,33 +225,36 @@ def descriptive_statistics(df, proxies):
         print(f"\n{forum} Forum:")
         print(forum_stats.to_string())
 
-# def compare_complexity_nonparametric(df, proxies, category_col, p_value_threshold=0.05):
-#     import pandas as pd
-#     import numpy as np
-#     from scipy import stats
-#     from statsmodels.stats.multicomp import MultiComparison
-#     results = {}
-#     for proxy in proxies:
-#         # Perform Kruskal-Wallis H-test
-#         categories = df[category_col].unique()
-#         data = [df[df[category_col] == category][proxy] for category in categories]
-#         h_stat, p_value = stats.kruskal(*data)
-#         # Perform post-hoc Dunn's test with Bonferroni correction
-#         if p_value < p_value_threshold:
-#             mc = MultiComparison(df[proxy], df[category_col])
-#             result = mc.allpairtest(stats.mannwhitneyu, method='bonf')[0]
-#             results[proxy] = {
-#                 'h_stat': h_stat,
-#                 'p_value': p_value,
-#                 'dunn_result': result
-#               }
-#         else:
-#             results[proxy] = {
-#                 'h_stat': h_stat,
-#                 'p_value': p_value,
-#                 'dunn_result': None
-#               }
-#     return results
+def compare_complexity_nonparametric(df, proxies, category_col, p_value_threshold=0.05):
+    import pandas as pd
+    import numpy as np
+    from scipy import stats
+    results = {}
+    for proxy in proxies:
+        # Perform Kruskal-Wallis H-test
+        categories = df[category_col].unique()
+        data = [df[df[category_col] == category][proxy] for category in categories]
+        h_stat, p_valuek = stats.kruskal(*data)
+        t_stat, p_valuet = stats.ttest_ind(*data)
+        results[proxy] = {
+              'Kruskal-Wallis H stat': h_stat,
+              'Kruskal-Wallis p_value': p_valuek,
+              "T Test T stat": t_stat,
+              "T Test p value": p_valuet,
+          }
+    return results
+
+            #'dunn_result': None
+        # Perform post-hoc Dunn's test with Bonferroni correction
+        # if p_value < p_value_threshold:
+        #     mc = MultiComparison(df[proxy], df[category_col])
+        #     result = mc.allpairtest(stats.mannwhitneyu, method='bonf')[0]
+        #     results[proxy] = {
+        #         'h_stat': h_stat,
+        #         'p_value': p_value,
+        #         'dunn_result': result
+        #       }
+        # else:
 
 
 def make_correlation_plots(df):
@@ -335,6 +341,10 @@ def corrcoefs(x,forum=r".",proxies=proxies, codist=True):
         stat, p_value = shapiro(x,sample=50)
         # Add the p-value to the histogram plot
         ax = plt.gca()
+        y_label = ax.get_ylabel()
+        x_label = ax.get_xlabel()
+        ax.set_ylabel(y_label,rotation=70)
+        ax.set_xlabel(x_label,rotation=30)
         ax.annotate("Shapiro-Wilk\np-value = {:.2e}\nN = {}".format(p_value,sample), xy=(0.2, 0.9), xycoords="axes fraction", fontsize=10)
 
         return sns.histplot(x, label=label, color=color, kde=True)
@@ -346,9 +356,9 @@ def corrcoefs(x,forum=r".",proxies=proxies, codist=True):
     g.map_diag(hist)
     if codist:
       print("upper")
-      g.map_upper(sns.histplot)
+      g.map_lower(sns.histplot)
     print("lower")
-    g.map_lower(reg_coef)
+    g.map_upper(reg_coef)
     g.tight_layout()
     return g
 
