@@ -34,6 +34,7 @@ lex_proxies_dirty = [
 ]
 
 lex_proxies_clean = [
+  'mean-word-length',
   'lexical-diversity words-clean',
   'lexical-density words-clean',
   'lexical-density lemmas-clean',
@@ -52,6 +53,33 @@ lex_proxies_bare = [
   'lexical-diversity lemmas-clean-bare',
 ]
 
+lex_proxies_dirty_nw = [
+  'lexical-diversity words',
+  'lexical-density words',
+  'lexical-density lemmas',
+  'lexical-diversity lemmas',
+  'TTR words',
+  'TTR lemmas',
+]
+
+lex_proxies_clean_nw = [
+  'lexical-diversity words-clean',
+  'lexical-density words-clean',
+  'lexical-density lemmas-clean',
+  'lexical-diversity lemmas-clean',
+  'TTR words-clean',
+  'TTR lemmas-clean',
+]
+
+lex_proxies_bare_nw = [
+  'lexical-diversity words-clean-bare',
+  'lexical-density words-clean-bare',
+  'lexical-density lemmas-clean-bare',
+  'lexical-diversity lemmas-clean-bare',
+  'TTR words-clean-bare',
+  'TTR lemmas-clean-bare',
+]
+
 lex_proxies = list(set([*lex_proxies_dirty,*lex_proxies_clean,*lex_proxies_bare]))
 
 proxies = syn_proxies + lex_proxies
@@ -60,20 +88,20 @@ proxies_clean = syn_proxies + lex_proxies_clean
 proxies_bare = syn_proxies + lex_proxies_bare
 
 
+def cronbach_alpha(df):
+    from pingouin import cronbach_alpha
+    return cronbach_alpha(df)
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def rank_forums_by_proxy_fig(df, t):
-    if t == "syn":
-      prox = syn_proxies
-    elif t == "lex":
-      prox = lex_proxies_dirty
-    elif t == "all":
-      prox = proxies
+def rank_forums_by_proxy_fig(df,prox=proxies):
     prox = sorted(prox)
+    df["leg-soc"] = df["forum"].apply(lambda x: "twitter" if x == "twitter" else "dáil")
+    
 
-    mean_values = df.groupby("forum")[prox].mean()
+    mean_values = df.groupby("leg-soc")[prox].mean()
     ranked_forums = mean_values.rank(ascending=False).astype(int)
 
     print("Forum Rankings by Proxy Measures:")
@@ -85,7 +113,7 @@ def rank_forums_by_proxy_fig(df, t):
     heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
     plt.title("Forum Rankings by Proxy Measures")
     plt.tight_layout()
-    plt.savefig("heatmap-rank-fora-by-proxies." +t+".png")
+    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.png")
 
 
 def rank_forums_by_proxy(df, proxies):
@@ -230,9 +258,12 @@ def corrcoefs(x,forum=r".",proxies=proxies, codist=True):
     
     g = sns.PairGrid(x)
     plt.suptitle(' '.join([f for f in fora]))
+    print("diag")
     g.map_diag(hist)
     if codist:
-      g.map_upper(sns.scatterplot)
+      print("upper")
+      g.map_upper(sns.histplot)
+    print("lower")
     g.map_lower(reg_coef)
     g.tight_layout()
     return g
