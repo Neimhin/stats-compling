@@ -11,7 +11,7 @@ mpl.rcParams["text.usetex"]=True
 mpl.rcParams["lines.linewidth"]=0.9
 mpl.rcParams["figure.dpi"]=400
 
-syn_proxies = [
+syn_proxies = sorted([
   'inverse mean-node-degree',
   'max-tree-depth',
 
@@ -21,9 +21,9 @@ syn_proxies = [
 
   'sentence-length-bare',
   'sentence-length',
-]
+])
 
-lex_proxies_dirty = [
+lex_proxies_dirty = sorted([
   'mean-word-length',
   'lexical-diversity words',
   'lexical-density words',
@@ -31,9 +31,9 @@ lex_proxies_dirty = [
   'lexical-diversity lemmas',
   'TTR words',
   'TTR lemmas',
-]
+])
 
-lex_proxies_clean = [
+lex_proxies_clean = sorted([
   'mean-word-length',
   'lexical-diversity words-clean',
   'lexical-density words-clean',
@@ -41,9 +41,9 @@ lex_proxies_clean = [
   'lexical-diversity lemmas-clean',
   'TTR words-clean',
   'TTR lemmas-clean',
-]
+])
 
-lex_proxies_bare = [
+lex_proxies_bare = sorted([
   'mean-word-length words-clean-bare',
   'TTR words-clean-bare',
   'TTR lemmas-clean-bare',
@@ -51,34 +51,34 @@ lex_proxies_bare = [
   'lexical-density words-clean-bare',
   'lexical-density lemmas-clean-bare',
   'lexical-diversity lemmas-clean-bare',
-]
+])
 
-lex_proxies_dirty_nw = [
+lex_proxies_dirty_nw = sorted([
   'lexical-diversity words',
   'lexical-density words',
   'lexical-density lemmas',
   'lexical-diversity lemmas',
   'TTR words',
   'TTR lemmas',
-]
+])
 
-lex_proxies_clean_nw = [
+lex_proxies_clean_nw = sorted([
   'lexical-diversity words-clean',
   'lexical-density words-clean',
   'lexical-density lemmas-clean',
   'lexical-diversity lemmas-clean',
   'TTR words-clean',
   'TTR lemmas-clean',
-]
+])
 
-lex_proxies_bare_nw = [
+lex_proxies_bare_nw = sorted([
   'lexical-diversity words-clean-bare',
   'lexical-density words-clean-bare',
   'lexical-density lemmas-clean-bare',
   'lexical-diversity lemmas-clean-bare',
   'TTR words-clean-bare',
   'TTR lemmas-clean-bare',
-]
+])
 
 lex_proxies = list(set([*lex_proxies_dirty,*lex_proxies_clean,*lex_proxies_bare]))
 
@@ -96,24 +96,108 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def rank_forums_by_proxy_fig(df,prox=proxies):
-    prox = sorted(prox)
-    df["leg-soc"] = df["forum"].apply(lambda x: "twitter" if x == "twitter" else "dáil")
-    
 
-    mean_values = df.groupby("leg-soc")[prox].mean()
-    ranked_forums = mean_values.rank(ascending=False).astype(int)
+def ministerial_split(df):
+    from dateutil import parser
+    min_ministerial = parser.parse("2011-03-11")
+    max_ministerial = parser.parse("2016-05-06")
+    df["ministerial-ternary"] = df["date"].apply(lambda x: "pre-ministerial" if x < min_ministerial else ("ministerial" if x >= min_ministerial and x <= max_ministerial else "post-ministerial"))
+    df["ministerial-binary"] = df["date"].apply(lambda x: "ministerial" if x >= min_ministerial and x <= max_ministerial else "non-ministerial")
 
-    print("Forum Rankings by Proxy Measures:")
-    print(ranked_forums.to_string())
+def rank_ministerial(df,prox=proxies):
+    ministerial_split(df)
+    df = df[df["sentence-length-bare"] > 0]
+    # Only looking at speeches
+    df = df[df["forum"] == "speech"]
+
+    grouped = df.groupby("ministerial-ternary")[prox]
+    ranked_mean = grouped.mean().rank(ascending=False).astype(int)
+    ranked_median = grouped.median().rank(ascending=False).astype(int)
+
+    print(ranked_mean)
+    print(ranked_median)
 
     plt.clf()
-    plt.figure(figsize=(10, 6))
-    heatmap = sns.heatmap(ranked_forums, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    fig, axes =  plt.subplots(2,2,figsize=(10, 20))
+    plt.suptitle("Ranking Pre-Ministerial vs Ministerial vs Post-Ministerial Complexity of Speeches")
+
+    heatmap = sns.heatmap(ranked_mean, ax=axes[0,0], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
     heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
-    plt.title("Forum Rankings by Proxy Measures")
+    plt.title("by Proxy Measure Mean")
+
+    heatmap = sns.heatmap(ranked_median, ax=axes[1,0], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("by Proxy Measure Median")
+
+    grouped = df.groupby("ministerial-binary")[prox]
+
+    ranked_mean = grouped.mean().rank(ascending=False).astype(int)
+    ranked_median = grouped.median().rank(ascending=False).astype(int)
+
+    print(ranked_mean)
+    print(ranked_median)
+
+    heatmap = sns.heatmap(ranked_mean, ax=axes[0,1], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("by Proxy Measure Mean")
+
+    heatmap = sns.heatmap(ranked_median, ax=axes[1,1], annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("by Proxy Measure Median")
+
     plt.tight_layout()
-    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.png")
+    plt.savefig("heatmap-rank-ministerial.nonempty.png")
+
+def rank_forums_by_proxy_fig_nonempty(df,prox=proxies):
+    df["production type"] = df["forum"].apply(lambda x: "twitter" if x == "twitter" else "dáil")
+    df = df[df["sentence-length-bare"] > 0]
+    
+
+    grouped = df.groupby("production type")[prox]
+    ranked_mean = grouped.mean().rank(ascending=False).astype(int)
+    ranked_median = grouped.median().rank(ascending=False).astype(int)
+
+
+    plt.clf()
+    plt.figure(figsize=(8, 4))
+    heatmap = sns.heatmap(ranked_mean, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("Dáil vs Twitter Ranked for Complexity by Proxy Measure Mean")
+    plt.tight_layout()
+    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.nonempty.mean.png")
+
+    plt.clf()
+    plt.figure(figsize=(8, 4))
+    heatmap = sns.heatmap(ranked_median, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("Dáil vs Twitter Ranked for Complexity by Proxy Measure Median")
+    plt.tight_layout()
+    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.nonempty.median.png")
+
+def rank_forums_by_proxy_fig(df,prox=proxies):
+    df["production type"] = df["forum"].apply(lambda x: "twitter" if x == "twitter" else "dáil")
+    
+
+    grouped = df.groupby("production type")[prox]
+    ranked_mean = grouped.mean().rank(ascending=False).astype(int)
+    ranked_median = grouped.median().rank(ascending=False).astype(int)
+
+
+    plt.clf()
+    plt.figure(figsize=(8, 4))
+    heatmap = sns.heatmap(ranked_mean, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("Dáil vs Twitter Ranked for Complexity by Proxy Measure Mean")
+    plt.tight_layout()
+    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.mean.png")
+
+    plt.clf()
+    plt.figure(figsize=(8, 4))
+    heatmap = sns.heatmap(ranked_median, annot=True, cmap=cmap(), linewidths=.5, fmt='d', cbar=False)
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), rotation=0)
+    plt.title("Dáil vs Twitter Ranked for Complexity by Proxy Measure Median")
+    plt.tight_layout()
+    plt.savefig("heatmap-rank-leg-soc-by-proxies.proxies-bare.median.png")
 
 
 def rank_forums_by_proxy(df, proxies):
@@ -138,33 +222,33 @@ def descriptive_statistics(df, proxies):
         print(f"\n{forum} Forum:")
         print(forum_stats.to_string())
 
-def compare_complexity_nonparametric(df, proxies, category_col, p_value_threshold=0.05):
-    import pandas as pd
-    import numpy as np
-    from scipy import stats
-    from statsmodels.stats.multicomp import MultiComparison
-    results = {}
-    for proxy in proxies:
-        # Perform Kruskal-Wallis H-test
-        categories = df[category_col].unique()
-        data = [df[df[category_col] == category][proxy] for category in categories]
-        h_stat, p_value = stats.kruskal(*data)
-        # Perform post-hoc Dunn's test with Bonferroni correction
-        if p_value < p_value_threshold:
-            mc = MultiComparison(df[proxy], df[category_col])
-            result = mc.allpairtest(stats.mannwhitneyu, method='bonf')[0]
-            results[proxy] = {
-                'h_stat': h_stat,
-                'p_value': p_value,
-                'dunn_result': result
-            }
-        else:
-            results[proxy] = {
-                'h_stat': h_stat,
-                'p_value': p_value,
-                'dunn_result': None
-            }
-    return results
+# def compare_complexity_nonparametric(df, proxies, category_col, p_value_threshold=0.05):
+#     import pandas as pd
+#     import numpy as np
+#     from scipy import stats
+#     from statsmodels.stats.multicomp import MultiComparison
+#     results = {}
+#     for proxy in proxies:
+#         # Perform Kruskal-Wallis H-test
+#         categories = df[category_col].unique()
+#         data = [df[df[category_col] == category][proxy] for category in categories]
+#         h_stat, p_value = stats.kruskal(*data)
+#         # Perform post-hoc Dunn's test with Bonferroni correction
+#         if p_value < p_value_threshold:
+#             mc = MultiComparison(df[proxy], df[category_col])
+#             result = mc.allpairtest(stats.mannwhitneyu, method='bonf')[0]
+#             results[proxy] = {
+#                 'h_stat': h_stat,
+#                 'p_value': p_value,
+#                 'dunn_result': result
+#               }
+#         else:
+#             results[proxy] = {
+#                 'h_stat': h_stat,
+#                 'p_value': p_value,
+#                 'dunn_result': None
+#               }
+#     return results
 
 
 def make_correlation_plots(df):
